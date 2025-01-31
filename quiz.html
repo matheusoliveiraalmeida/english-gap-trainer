@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English Gap Trainer</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 50px auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        input, button {
+            margin-top: 10px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Fill in the missing word</h2>
+        <p id="progress">0 / 0 Correct</p>
+        <p id="sentence">___ does that mean?</p>
+        <input type="text" id="answer" placeholder="Type the missing word">
+        <button onclick="checkAnswer()">Submit</button>
+        <button onclick="removePhrase()">Delete</button>
+        <p id="feedback"></p>
+        <button id="listenBtn" class="hidden" onclick="speakSentence()">Listen</button>
+        <button id="speakBtn" class="hidden" onclick="checkPronunciation()">Speak</button>
+        <h3>Add a new phrase</h3>
+        <input type="text" id="newPhrase" placeholder="Enter a full sentence">
+        <button onclick="addPhrase()">Add</button>
+        <h3>Set Review Limit</h3>
+        <input type="number" id="reviewLimit" min="1" max="100" value="10">
+        <button onclick="setReviewLimit()">Apply</button>
+    </div>
+
+    <script>
+        let allPhrases = JSON.parse(localStorage.getItem("phrases")) || [
+            "What does that mean?",
+            "How are you?",
+            "Where is the bathroom?",
+            "What time is it?",
+            "Can you help me?"
+        ];
+        let phrases = [];
+        let currentPhrase = "";
+        let missingWord = "";
+        let reviewLimit = 10;
+        let correctAnswers = 0;
+        let totalQuestions = 0;
+        let pronunciationCorrect = false;
+
+        function savePhrases() {
+            localStorage.setItem("phrases", JSON.stringify(allPhrases));
+        }
+
+        function setReviewLimit() {
+            reviewLimit = parseInt(document.getElementById("reviewLimit").value);
+            resetReviewSet();
+        }
+
+        function resetReviewSet() {
+            phrases = [...allPhrases].sort(() => 0.5 - Math.random()).slice(0, reviewLimit);
+            totalQuestions = phrases.length;
+            correctAnswers = 0;
+            updateProgress();
+            loadPhrase();
+        }
+
+        function updateProgress() {
+            document.getElementById("progress").innerText = `${correctAnswers} / ${totalQuestions} Correct`;
+        }
+
+        function loadPhrase() {
+            if (phrases.length === 0) {
+                Swal.fire("Done!", "You completed your review session!", "success");
+                return;
+            }
+            currentPhrase = phrases.pop();
+            let words = currentPhrase.split(" ");
+            let index = Math.floor(Math.random() * words.length);
+            missingWord = words[index];
+            document.getElementById("sentence").innerText = currentPhrase.replace(missingWord, "___");
+            document.getElementById("answer").value = "";
+            document.getElementById("listenBtn").classList.add("hidden");
+            document.getElementById("speakBtn").classList.add("hidden");
+            pronunciationCorrect = false;
+        }
+        
+        function checkAnswer() {
+            let userAnswer = document.getElementById("answer").value.trim();
+            if (userAnswer.toLowerCase() === missingWord.toLowerCase()) {
+                document.getElementById("listenBtn").classList.remove("hidden");
+                document.getElementById("speakBtn").classList.remove("hidden");
+                Swal.fire("Correct!", "Now pronounce it!", "success");
+            } else {
+                Swal.fire("Wrong!", "Try again!", "error");
+            }
+        }
+
+        function speakSentence() {
+            let msg = new SpeechSynthesisUtterance(currentPhrase);
+            msg.lang = "en-US";
+            window.speechSynthesis.speak(msg);
+        }
+        
+        function checkPronunciation() {
+            let recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = "en-US";
+            recognition.start();
+            
+            recognition.onresult = function(event) {
+                let spokenText = event.results[0][0].transcript.toLowerCase().trim();
+                let expectedText = currentPhrase.toLowerCase().trim().replace(/[?.!,]/g, "");
+                spokenText = spokenText.replace(/[?.!,]/g, "");
+                if (spokenText === expectedText) {
+                    pronunciationCorrect = true;
+                    correctAnswers++;
+                    updateProgress();
+                    Swal.fire({
+                        title: "Great!",
+                        text: "Good pronunciation! Moving to next.",
+                        icon: "success",
+                        timer: 1500,
+                        showConfirmButton: false
+                    }).then(() => {
+                        loadPhrase();
+                    });
+                } else {
+                    Swal.fire("Oops!", "You said: " + spokenText, "error");
+                }
+            };
+        }
+        
+        function addPhrase() {
+            let newPhrase = document.getElementById("newPhrase").value.trim();
+            if (newPhrase) {
+                allPhrases.push(newPhrase);
+                savePhrases();
+                Swal.fire("Added!", "New phrase added successfully!", "success");
+                document.getElementById("newPhrase").value = "";
+                resetReviewSet();
+            }
+        }
+
+        function removePhrase() {
+            let index = allPhrases.indexOf(currentPhrase);
+            if (index !== -1) {
+                allPhrases.splice(index, 1);
+                savePhrases();
+                Swal.fire("Deleted!", "Phrase removed!", "warning");
+                resetReviewSet();
+            }
+        }
+
+        resetReviewSet();
+    </script>
+</body>
+</html>
